@@ -1,0 +1,37 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html { scroll-behavior: smooth; }
+body { font-family: 'Inter', system-ui, sans-serif; }
+h1, h2, h3, h4 { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
+section[id] { scroll-margin-top: 86px; }
+::selection { background: #D8F3DC; color: #1B4332; }
+
+.img-fallback { background: linear-gradient(135deg, #40916C 0%, #2D6A4F 55%, #1B4332 100%); }
+.card-lift { transition: transform .3s ease, box-shadow .3s ease; }
+.card-lift:hover { transform: translateY(-4px); box-shadow: 0 20px 40px -16px rgba(27,67,50,.30); }
+
+@keyframes modalIn { from { opacity: 0; transform: translateY(16px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+.modal-panel { animation: modalIn .25s ease; }
+
+.cal-day { transition: background-color .18s ease, color .18s ease, transform .18s ease; }
+.cal-day:not(.is-off):not(.is-full):not(.is-past):hover { background-color: rgba(64,145,108,.16); }
+.cal-day:not(.is-off):not(.is-full):not(.is-past):active { transform: scale(.92); }
+
+.btn-primary { transition: transform .2s ease, box-shadow .2s ease, background-color .2s ease; }
+.btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 12px 24px -12px rgba(45,106,79,.65); }
+.btn-primary:active:not(:disabled) { transform: translateY(0); }
+.btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+
+@keyframes toastIn { from { opacity: 0; transform: translateY(-14px) scale(.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
+.toast-in { animation: toastIn .3s cubic-bezier(.16,1,.3,1); }
+@keyframes toastBar { from { width: 100%; } to { width: 0%; } }
+.toast-bar { animation: toastBar 4s linear forwards; }
+
+@keyframes priceFlash { 0% { background-color: rgba(244,162,97,.20); } 100% { background-color: #FFFFFF; } }
+.price-flash { animation: priceFlash .45s ease; }
+
+.grain { background-image: radial-gradient(rgba(255,255,255,.14) 1px, transparent 1px); background-size: 4px 4px; }
+.no-scroll { overflow: hidden; }
+input, select, textarea { font-family: inherit; }
