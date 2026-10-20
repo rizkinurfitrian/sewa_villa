@@ -1,8 +1,9 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { X, CalendarCheck, CreditCard } from "lucide-react";
-import { EMAIL_RE, STATUS_PENDING } from "../data/constants";
+import { EMAIL_RE } from "../data/constants";
 import { calcPrice } from "../utils/pricing";
-import { bookingCode } from "../utils/booking";
+import { dataUrlToFile } from "../utils/image";
+import { api } from "../api";
 import { dateKey, addDays, startOfDay, today, nightsBetween, fmtShort, fmtFull } from "../utils/date";
 import Calendar from "./Calendar";
 import PricePanel from "./PricePanel";
@@ -114,28 +115,28 @@ export default function BookingModal({ room, blocked, onClose, onConfirmed, toas
     setShowPay(true);
   };
 
-  const handlePaid = (methodLabel, proof) => {
-    onConfirmed({
-      kode: bookingCode(),
-      roomId: room.id,
-      roomName: room.name,
-      roomImg: room.img,
-      checkIn: dateKey(checkIn),
-      checkOut: dateKey(checkOut),
-      nights: price.nights,
+  const handlePaid = async (metode, proofDataUrl) => {
+    const created = await api.createBooking({
+      room_id: room.id,
+      check_in: dateKey(checkIn),
+      check_out: dateKey(checkOut),
       nama: name.trim(),
       email: email.trim(),
       tamu: guests,
-      catatan: note.trim(),
-      base: Math.round(price.base),
-      surcharge: Math.round(price.surcharge),
-      total: Math.round(price.total),
-      dp: Math.round(price.dp),
-      metode: methodLabel,
-      buktiTransfer: proof || "",
-      status: STATUS_PENDING,
-      dibuat: new Date().toISOString(),
+      catatan: note.trim() || undefined,
+      metode,
     });
+
+    let finalBooking = created;
+    if (proofDataUrl) {
+      try {
+        finalBooking = await api.uploadProof(created.kode, dataUrlToFile(proofDataUrl));
+      } catch {
+        // Booking sudah tersimpan; bukti transfer bisa diunggah ulang oleh admin bila perlu.
+        finalBooking = created;
+      }
+    }
+    onConfirmed(finalBooking);
   };
 
   return (
@@ -264,7 +265,7 @@ export default function BookingModal({ room, blocked, onClose, onConfirmed, toas
           guestName={name.trim()}
           guestCount={guests}
           onClose={closePay}
-          onSuccess={handlePaid}
+          onSubmit={handlePaid}
         />
       )}
     </>

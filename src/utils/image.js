@@ -1,5 +1,14 @@
 export const MAX_PROOF_BYTES = 5 * 1024 * 1024;
 
+export function dataUrlToFile(dataUrl, filename = "bukti.jpg") {
+  const [head, b64] = dataUrl.split(",");
+  const mime = (head.match(/data:(.*?);/) || [])[1] || "image/jpeg";
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new File([bytes], filename, { type: mime });
+}
+
 export function isImageFile(file) {
   return !!file && file.type.startsWith("image/");
 }

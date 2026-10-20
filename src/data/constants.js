@@ -1,12 +1,8 @@
 import { Snowflake, Wifi, Coffee, Waves, Laptop, TreePine, Landmark, QrCode, FileText } from "lucide-react";
 
-export const STORAGE_KEY = "nginaplangsung.bookings.v1";
 export const WEEKEND_RATE = 0.3;
 export const HOLIDAY_RATE = 0.5;
 export const DP_RATE = 0.3;
-
-export const ADMIN_PASSWORD = "admin123";
-export const ADMIN_SESSION_KEY = "nginaplangsung.admin.session.v1";
 
 export const STATUS_PENDING = "Menunggu Konfirmasi";
 export const STATUS_CONFIRMED = "DP Lunas";
@@ -33,56 +29,15 @@ export const HOLIDAYS = {
   "12-25": "Hari Raya Natal",
 };
 
-export const ROOMS = [
-  {
-    id: "villa-padi",
-    name: "Villa Padi View",
-    tagline: "Balkon menghadap sawah, kolam privat",
-    price: 750000,
-    maxGuests: 2,
-    size: "48 m²",
-    bed: "1 King Bed",
-    img: "https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=900&q=80",
-    amenities: [
-      { icon: Snowflake, label: "AC" },
-      { icon: Wifi, label: "WiFi" },
-      { icon: Coffee, label: "Sarapan" },
-      { icon: Waves, label: "Kolam Privat" },
-    ],
-  },
-  {
-    id: "suite-kopi",
-    name: "Suite Kopi Arabika",
-    tagline: "Meja kerja, taman baca, dan suasana tenang",
-    price: 550000,
-    maxGuests: 3,
-    size: "36 m²",
-    bed: "1 Queen + 1 Single",
-    img: "https://images.unsplash.com/photo-1611892440504-42a792e24d32?auto=format&fit=crop&w=900&q=80",
-    amenities: [
-      { icon: Snowflake, label: "AC" },
-      { icon: Wifi, label: "WiFi" },
-      { icon: Coffee, label: "Sarapan" },
-      { icon: Laptop, label: "Meja Kerja" },
-    ],
-  },
-  {
-    id: "kamar-hutan",
-    name: "Kamar Hutan Pinus",
-    tagline: "Teras kayu di tepi hutan, udara segar",
-    price: 450000,
-    maxGuests: 2,
-    size: "28 m²",
-    bed: "1 Queen Bed",
-    img: "https://images.unsplash.com/photo-1449158743715-0a90ebb6d2d8?auto=format&fit=crop&w=900&q=80",
-    amenities: [
-      { icon: Snowflake, label: "AC" },
-      { icon: Wifi, label: "WiFi" },
-      { icon: Coffee, label: "Sarapan" },
-      { icon: TreePine, label: "Teras Hutan" },
-    ],
-  },
-];
+// Map amenity key (dikirim API) ke ikon lucide.
+export const AMENITY_ICONS = {
+  snowflake: Snowflake,
+  wifi: Wifi,
+  coffee: Coffee,
+  waves: Waves,
+  laptop: Laptop,
+  "tree-pine": TreePine,
+};
 
 export const PAY_METHODS = [
   { id: "bca", label: "Transfer BCA", desc: "a.n. PT NginapLangsung · 872-0145-2098", icon: Landmark },

@@ -1,9 +1,8 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
-import { STORAGE_KEY } from "./data/constants";
-import { useLocalStorage } from "./hooks/useLocalStorage";
+import { useState, useCallback, useEffect } from "react";
 import { useToast } from "./hooks/useToast";
 import { useHashRoute } from "./hooks/useHashRoute";
-import { buildBlocked } from "./utils/blocked";
+import { useMyBookings } from "./hooks/useMyBookings";
+import { api } from "./api";
 import Navbar from "./components/Navbar";
 import Hero from "./components/Hero";
 import RoomList from "./components/RoomList";
@@ -14,18 +13,52 @@ import BookingModal from "./components/BookingModal";
 import AdminPage from "./components/AdminPage";
 import ToastContainer from "./components/Toast";
 
+const fetchRoomsAndBlocked = () => Promise.all([api.listRooms(), api.availability()]);
+
 export default function App() {
-  const [bookings, setBookings] = useLocalStorage(STORAGE_KEY, []);
+  const [rooms, setRooms] = useState([]);
+  const [blocked, setBlocked] = useState({});
+  const [loading, setLoading] = useState(true);
   const [selectedRoom, setSelectedRoom] = useState(null);
   const { toasts, toast } = useToast();
   const route = useHashRoute();
-  const blocked = useMemo(() => buildBlocked(bookings), [bookings]);
+  const { bookings: myBookings, addBooking } = useMyBookings();
 
   const isAdmin = route === "admin";
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "auto" });
   }, [isAdmin]);
+
+  useEffect(() => {
+    let active = true;
+    fetchRoomsAndBlocked()
+      .then(([roomList, avail]) => {
+        if (!active) return;
+        setRooms(roomList || []);
+        setBlocked((avail && avail.blocked) || {});
+      })
+      .catch(() => {
+        if (active) toast("Gagal memuat data dari server. Pastikan API berjalan.", "error");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [toast]);
+
+  const loadData = useCallback(() => {
+    return fetchRoomsAndBlocked()
+      .then(([roomList, avail]) => {
+        setRooms(roomList || []);
+        setBlocked((avail && avail.blocked) || {});
+      })
+      .catch(() => {
+        toast("Gagal memuat data dari server. Pastikan API berjalan.", "error");
+      });
+  }, [toast]);
 
   const closeModal = useCallback(() => setSelectedRoom(null), []);
 
@@ -34,8 +67,9 @@ export default function App() {
   }, []);
 
   const handleConfirmed = (booking) => {
-    setBookings((prev) => [booking, ...prev]);
+    addBooking(booking);
     setSelectedRoom(null);
+    loadData();
     toast(`Pembayaran diterima. Booking ${booking.roomName} menunggu konfirmasi admin.`, "success");
     setTimeout(() => document.getElementById("riwayat")?.scrollIntoView({ behavior: "smooth", block: "start" }), 500);
   };
@@ -43,7 +77,7 @@ export default function App() {
   if (isAdmin) {
     return (
       <>
-        <AdminPage bookings={bookings} setBookings={setBookings} toast={toast} onExit={exitAdmin} />
+        <AdminPage toast={toast} onExit={exitAdmin} onChanged={loadData} />
         <ToastContainer toasts={toasts} />
       </>
     );
@@ -53,9 +87,9 @@ export default function App() {
     <>
       <Navbar />
       <Hero />
-      <RoomList onSelect={setSelectedRoom} />
+      <RoomList rooms={rooms} loading={loading} onSelect={setSelectedRoom} />
       <Facilities />
-      <BookingHistory bookings={bookings} />
+      <BookingHistory bookings={myBookings} loading={loading} />
       <Footer />
 
       {selectedRoom && (

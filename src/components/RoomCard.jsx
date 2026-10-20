@@ -1,5 +1,6 @@
-import { Users, Maximize2, BedDouble, ArrowRight } from "lucide-react";
+import { Users, Maximize2, BedDouble, ArrowRight, Coffee } from "lucide-react";
 import { rupiah } from "../utils/format";
+import { AMENITY_ICONS } from "../data/constants";
 
 export default function RoomCard({ room, onSelect }) {
   return (
@@ -27,11 +28,14 @@ export default function RoomCard({ room, onSelect }) {
         </div>
 
         <div className="mt-4 flex flex-wrap gap-1.5">
-          {room.amenities.map(({ icon: Icon, label }) => (
-            <span key={label} className="inline-flex items-center gap-1.5 rounded-lg bg-primary-50 px-2.5 py-1.5 text-xs font-semibold text-primary-700">
-              <Icon className="h-3.5 w-3.5" /> {label}
-            </span>
-          ))}
+          {room.amenities.map((a) => {
+            const Icon = AMENITY_ICONS[a.key] || Coffee;
+            return (
+              <span key={a.key || a.label} className="inline-flex items-center gap-1.5 rounded-lg bg-primary-50 px-2.5 py-1.5 text-xs font-semibold text-primary-700">
+                <Icon className="h-3.5 w-3.5" /> {a.label}
+              </span>
+            );
+          })}
         </div>
 
         <div className="mt-5 flex items-end justify-between gap-3 border-t border-dashed border-ink/10 pt-4">

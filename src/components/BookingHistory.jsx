@@ -3,7 +3,22 @@ import { STATUS_BADGE, STATUS_CONFIRMED, STATUS_PENDING } from "../data/constant
 import { rupiah } from "../utils/format";
 import { fmtShort, parseKey } from "../utils/date";
 
-export default function BookingHistory({ bookings }) {
+function SkeletonCard() {
+  return (
+    <div className="overflow-hidden rounded-2xl border border-ink/5 bg-white p-5 shadow-lg shadow-emerald-900/5">
+      <div className="flex animate-pulse gap-4">
+        <div className="h-24 w-full shrink-0 rounded-xl bg-primary-100 sm:w-28" />
+        <div className="flex-1 space-y-2 py-1">
+          <div className="h-4 w-2/3 rounded bg-primary-100" />
+          <div className="h-3 w-1/2 rounded bg-primary-50" />
+          <div className="h-3 w-1/3 rounded bg-primary-50" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function BookingHistory({ bookings, loading }) {
   const has = bookings.length > 0;
 
   return (
@@ -13,17 +28,22 @@ export default function BookingHistory({ bookings }) {
           <div>
             <span className="text-xs font-bold uppercase tracking-[0.18em] text-warm-dark">Tersimpan otomatis</span>
             <h2 className="mt-2 font-head text-3xl font-extrabold tracking-tight text-primary-900 sm:text-4xl">Riwayat Booking</h2>
-            <p className="mt-3 max-w-xl text-ink/65">Booking Anda tersimpan otomatis di perangkat ini — tanpa perlu akun. Status pembayaran diperbarui oleh admin.</p>
+            <p className="mt-3 max-w-xl text-ink/65">Booking dari perangkat ini tersimpan dan disinkronkan dengan server. Status pembayaran diperbarui oleh admin secara langsung.</p>
           </div>
         </div>
 
         <div className="mt-8">
-          {!has ? (
+          {loading && !has ? (
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <SkeletonCard />
+              <SkeletonCard />
+            </div>
+          ) : !has ? (
             <div className="rounded-2xl border border-dashed border-ink/15 bg-white/70 px-6 py-14 text-center shadow-lg shadow-emerald-900/5">
               <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-primary-50 text-primary-500"><CalendarX className="h-7 w-7" /></span>
               <h3 className="mt-5 font-head text-lg font-bold text-primary-900">Belum ada booking</h3>
               <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-ink/60">
-                Kamar yang Anda pesan beserta status pembayarannya akan tampil di sini, tersimpan otomatis di perangkat ini.
+                Kamar yang Anda pesan beserta status pembayarannya akan tampil di sini.
               </p>
               <a href="#booking" className="btn-primary mt-6 inline-flex items-center gap-2 rounded-xl bg-primary-600 px-5 py-3 text-sm font-semibold text-cream shadow-soft">
                 <Search className="h-4 w-4" /> Mulai pilih kamar

@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import {
   ArrowLeft,
   CalendarDays,
@@ -18,14 +18,13 @@ import {
   X,
 } from "lucide-react";
 import {
-  ADMIN_PASSWORD,
-  ADMIN_SESSION_KEY,
   STATUS_BADGE,
   STATUS_CONFIRMED,
   STATUS_PENDING,
 } from "../data/constants";
 import { rupiah } from "../utils/format";
 import { fmtShort, parseKey } from "../utils/date";
+import { api, getToken, setToken } from "../api";
 
 const FILTERS = [
   { id: "all", label: "Semua" },
@@ -47,19 +46,27 @@ function StatusBadge({ status }) {
 }
 
 function Login({ onLogin, onExit }) {
+  const [email, setEmail] = useState("admin@nginaplangsung.test");
   const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
-    if (password === ADMIN_PASSWORD) {
-      sessionStorage.setItem(ADMIN_SESSION_KEY, "1");
-      setError("");
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      const { token } = await api.login(email.trim(), password);
+      setToken(token);
       setPassword("");
       onLogin();
-    } else {
-      setError("Password salah. Coba lagi.");
+    } catch (err) {
+      const first = err.errors && Object.values(err.errors)[0];
+      setError(first || err.message || "Login gagal. Coba lagi.");
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -87,7 +94,23 @@ function Login({ onLogin, onExit }) {
             Halaman khusus admin untuk konfirmasi pembayaran pelanggan dan penghapusan riwayat booking.
           </p>
 
-          <label htmlFor="adminPass" className="mb-1.5 mt-6 block text-xs font-bold uppercase tracking-wider text-ink/55">
+          <label htmlFor="adminEmail" className="mb-1.5 mt-6 block text-xs font-bold uppercase tracking-wider text-ink/55">
+            Email Admin
+          </label>
+          <div className="relative">
+            <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink/35" />
+            <input
+              id="adminEmail"
+              type="email"
+              autoComplete="username"
+              value={email}
+              onChange={(e) => { setEmail(e.target.value); setError(""); }}
+              placeholder="admin@domain.com"
+              className={`${inputCls} pl-10`}
+            />
+          </div>
+
+          <label htmlFor="adminPass" className="mb-1.5 mt-4 block text-xs font-bold uppercase tracking-wider text-ink/55">
             Password Admin
           </label>
           <div className="relative">
@@ -112,8 +135,16 @@ function Login({ onLogin, onExit }) {
           </div>
           {error && <p className="mt-1.5 text-xs font-medium text-full">{error}</p>}
 
-          <button type="submit" className="btn-primary mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary-600 px-5 py-3.5 font-semibold text-cream shadow-soft">
-            <Lock className="h-[18px] w-[18px]" /> Masuk sebagai Admin
+          <button type="submit" disabled={busy} className="btn-primary mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary-600 px-5 py-3.5 font-semibold text-cream shadow-soft disabled:opacity-60">
+            {busy ? (
+              <span className="inline-flex items-center gap-2">
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-cream/30 border-t-cream" /> Memeriksa…
+              </span>
+            ) : (
+              <>
+                <Lock className="h-[18px] w-[18px]" /> Masuk sebagai Admin
+              </>
+            )}
           </button>
 
           <button type="button" onClick={onExit} className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-ink/55 transition hover:text-primary-700">
@@ -139,22 +170,62 @@ function Stat({ icon: Icon, label, value, tone }) {
   );
 }
 
-export default function AdminPage({ bookings, setBookings, toast, onExit }) {
-  const [authed, setAuthed] = useState(() => sessionStorage.getItem(ADMIN_SESSION_KEY) === "1");
+export default function AdminPage({ toast, onExit, onChanged }) {
+  const [authed, setAuthed] = useState(() => !!getToken());
+  const [bookings, setBookings] = useState({ list: [], stats: { total: 0, pending: 0, confirmed: 0, income: 0 } });
+  const [loading, setLoading] = useState(() => !!getToken());
   const [filter, setFilter] = useState("all");
   const [query, setQuery] = useState("");
   const [proofView, setProofView] = useState(null);
 
-  const stats = useMemo(() => {
-    const pending = bookings.filter((b) => b.status !== STATUS_CONFIRMED);
-    const confirmed = bookings.filter((b) => b.status === STATUS_CONFIRMED);
-    const income = confirmed.reduce((sum, b) => sum + (b.dp || 0), 0);
-    return { pending: pending.length, confirmed: confirmed.length, income };
-  }, [bookings]);
+  const applyData = useCallback((list, stats) => {
+    setBookings({ list: list || [], stats: stats || { total: 0, pending: 0, confirmed: 0, income: 0 } });
+  }, []);
+
+  const handleError = useCallback((err) => {
+    if (err.status === 401) {
+      setToken(null);
+      setAuthed(false);
+      toast("Sesi admin berakhir. Silakan login kembali.", "error");
+    } else {
+      toast(err.message || "Gagal memuat data booking.", "error");
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    if (!authed) return;
+    let active = true;
+    Promise.all([api.adminList(), api.adminStats()])
+      .then(([list, stats]) => {
+        if (active) applyData(list, stats);
+      })
+      .catch((err) => {
+        if (active) handleError(err);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [authed, applyData, handleError]);
+
+  const loadData = useCallback(() => {
+    return Promise.all([api.adminList(), api.adminStats()])
+      .then(([list, stats]) => {
+        applyData(list, stats);
+      })
+      .catch((err) => {
+        handleError(err);
+      });
+  }, [applyData, handleError]);
+
+  const stats = bookings.stats;
+  const list = useMemo(() => bookings.list || [], [bookings.list]);
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return bookings.filter((b) => {
+    return list.filter((b) => {
       const matchFilter = filter === "all" || (b.status || STATUS_PENDING) === filter;
       const matchQuery =
         !q ||
@@ -164,36 +235,56 @@ export default function AdminPage({ bookings, setBookings, toast, onExit }) {
         String(b.roomName || "").toLowerCase().includes(q);
       return matchFilter && matchQuery;
     });
-  }, [bookings, filter, query]);
+  }, [list, filter, query]);
 
-  const logout = () => {
-    sessionStorage.removeItem(ADMIN_SESSION_KEY);
+  const logout = async () => {
+    try {
+      await api.logout();
+    } catch {
+      // token mungkin sudah kedaluwarsa; abaikan
+    }
+    setToken(null);
     setAuthed(false);
+    setBookings({ list: [], stats: { total: 0, pending: 0, confirmed: 0, income: 0 } });
     setQuery("");
     setFilter("all");
     toast("Anda telah keluar dari panel admin.", "info");
   };
 
-  const confirmPayment = (kode) => {
-    setBookings((prev) =>
-      prev.map((b) =>
-        b.kode === kode ? { ...b, status: STATUS_CONFIRMED, dikonfirmasi: new Date().toISOString() } : b
-      )
-    );
-    toast(`Pembayaran booking ${kode} berhasil dikonfirmasi.`, "success");
+  const confirmPayment = async (b) => {
+    try {
+      await api.adminConfirm(b.id);
+      toast(`Pembayaran booking ${b.kode} berhasil dikonfirmasi.`, "success");
+      loadData();
+      onChanged?.();
+    } catch (err) {
+      toast(err.message || "Gagal mengonfirmasi pembayaran.", "error");
+    }
   };
 
-  const removeBooking = (kode) => {
-    if (!window.confirm(`Hapus booking ${kode} dari riwayat? Tindakan ini tidak bisa dibatalkan.`)) return;
-    setBookings((prev) => prev.filter((b) => b.kode !== kode));
-    toast(`Booking ${kode} dihapus dari riwayat.`, "info");
+  const removeBooking = async (b) => {
+    if (!window.confirm(`Hapus booking ${b.kode} dari riwayat? Tindakan ini tidak bisa dibatalkan.`)) return;
+    try {
+      await api.adminDelete(b.id);
+      toast(`Booking ${b.kode} dihapus dari riwayat.`, "info");
+      loadData();
+      onChanged?.();
+    } catch (err) {
+      toast(err.message || "Gagal menghapus booking.", "error");
+    }
   };
 
-  const clearAll = () => {
-    if (bookings.length === 0) return;
-    if (!window.confirm(`Hapus SEMUA ${bookings.length} riwayat booking? Tindakan ini tidak bisa dibatalkan.`)) return;
-    setBookings([]);
-    toast("Seluruh riwayat booking berhasil dihapus.", "info");
+  const clearAll = async () => {
+    if (list.length === 0) return;
+    if (!window.confirm(`Hapus SEMUA ${list.length} riwayat booking? Tindakan ini tidak bisa dibatalkan.`)) return;
+    try {
+      await api.adminClear();
+      toast("Seluruh riwayat booking berhasil dihapus.", "info");
+      loadData();
+      onChanged?.();
+    } catch (err) {
+      toast(err.message || "Gagal menghapus riwayat.", "error");
+    }
   };
 
   useEffect(() => {
@@ -227,7 +318,7 @@ export default function AdminPage({ bookings, setBookings, toast, onExit }) {
 
       <main className="mx-auto max-w-6xl px-4 pt-8 sm:px-6">
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <Stat icon={CalendarDays} label="Total booking" value={bookings.length} tone="bg-primary-50 text-primary-600" />
+          <Stat icon={CalendarDays} label="Total booking" value={stats.total} tone="bg-primary-50 text-primary-600" />
           <Stat icon={Clock3} label="Menunggu konfirmasi" value={stats.pending} tone="bg-warm/20 text-warm-dark" />
           <Stat icon={CircleCheck} label="Pembayaran dikonfirmasi" value={stats.confirmed} tone="bg-primary-100 text-primary-700" />
           <Stat icon={CreditCard} label="Total DP masuk" value={rupiah(stats.income)} tone="bg-primary-600 text-cream" />
@@ -268,7 +359,7 @@ export default function AdminPage({ bookings, setBookings, toast, onExit }) {
             <button
               type="button"
               onClick={clearAll}
-              disabled={bookings.length === 0}
+              disabled={list.length === 0}
               className="inline-flex items-center justify-center gap-2 rounded-xl border border-full/30 bg-full/5 px-4 py-2.5 text-sm font-semibold text-full transition hover:bg-full/10 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <Trash2 className="h-4 w-4" /> Hapus Semua Riwayat
@@ -277,16 +368,31 @@ export default function AdminPage({ bookings, setBookings, toast, onExit }) {
         </div>
 
         <div className="mt-6">
-          {visible.length === 0 ? (
+          {loading && list.length === 0 ? (
+            <div className="space-y-4">
+              {Array.from({ length: 2 }).map((_, i) => (
+                <div key={i} className="overflow-hidden rounded-2xl border border-ink/5 bg-white p-5 shadow-lg shadow-emerald-900/5">
+                  <div className="flex animate-pulse gap-4">
+                    <div className="h-28 w-40 shrink-0 rounded-xl bg-primary-100" />
+                    <div className="flex-1 space-y-2 py-1">
+                      <div className="h-4 w-1/3 rounded bg-primary-100" />
+                      <div className="h-3 w-1/2 rounded bg-primary-50" />
+                      <div className="h-3 w-2/3 rounded bg-primary-50" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : visible.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-ink/15 bg-white/70 px-6 py-16 text-center shadow-lg shadow-emerald-900/5">
               <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-primary-50 text-primary-500">
                 <Search className="h-7 w-7" />
               </span>
               <h3 className="mt-5 font-head text-lg font-bold text-primary-900">
-                {bookings.length === 0 ? "Belum ada booking masuk" : "Tidak ada booking yang cocok"}
+                {list.length === 0 ? "Belum ada booking masuk" : "Tidak ada booking yang cocok"}
               </h3>
               <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-ink/60">
-                {bookings.length === 0
+                {list.length === 0
                   ? "Booking dari pelanggan akan otomatis muncul di sini setelah pembayaran DP."
                   : "Coba ubah kata kunci pencarian atau filter status."}
               </p>
@@ -356,7 +462,7 @@ export default function AdminPage({ bookings, setBookings, toast, onExit }) {
                           {status !== STATUS_CONFIRMED ? (
                             <button
                               type="button"
-                              onClick={() => confirmPayment(b.kode)}
+                              onClick={() => confirmPayment(b)}
                               className="btn-primary inline-flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-cream shadow-soft"
                             >
                               <CircleCheck className="h-4 w-4" /> Konfirmasi Pembayaran
@@ -369,7 +475,7 @@ export default function AdminPage({ bookings, setBookings, toast, onExit }) {
                           )}
                           <button
                             type="button"
-                            onClick={() => removeBooking(b.kode)}
+                            onClick={() => removeBooking(b)}
                             className="inline-flex items-center gap-2 rounded-xl border border-full/30 bg-full/5 px-4 py-2.5 text-sm font-semibold text-full transition hover:bg-full/10"
                           >
                             <Trash2 className="h-4 w-4" /> Hapus Booking
@@ -385,7 +491,7 @@ export default function AdminPage({ bookings, setBookings, toast, onExit }) {
         </div>
 
         <p className="mt-8 text-center text-xs text-ink/45">
-          Data booking tersimpan di browser ini (localStorage). Halaman admin tidak ditampilkan pada tampilan pelanggan.
+          Data booking tersimpan di server. Halaman admin tidak ditampilkan pada tampilan pelanggan.
         </p>
       </main>
 

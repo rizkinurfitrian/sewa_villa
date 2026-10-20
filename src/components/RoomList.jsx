@@ -1,8 +1,7 @@
 import { Info } from "lucide-react";
-import { ROOMS } from "../data/constants";
 import RoomCard from "./RoomCard";
 
-export default function RoomList({ onSelect }) {
+export default function RoomList({ rooms, loading, onSelect }) {
   return (
     <section id="booking" className="relative py-16 sm:py-20">
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
@@ -18,9 +17,22 @@ export default function RoomList({ onSelect }) {
         </div>
 
         <div className="mt-10 grid grid-cols-1 gap-7 md:grid-cols-2 lg:grid-cols-3">
-          {ROOMS.map((room) => (
-            <RoomCard key={room.id} room={room} onSelect={onSelect} />
-          ))}
+          {loading && rooms.length === 0 ? (
+            Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="card-lift overflow-hidden rounded-2xl border border-ink/5 bg-white shadow-lg shadow-emerald-900/5">
+                <div className="aspect-[16/10] animate-pulse bg-primary-100" />
+                <div className="space-y-3 p-5">
+                  <div className="h-4 w-2/3 animate-pulse rounded bg-primary-100" />
+                  <div className="h-3 w-1/2 animate-pulse rounded bg-primary-50" />
+                  <div className="h-8 w-full animate-pulse rounded bg-primary-50" />
+                </div>
+              </div>
+            ))
+          ) : (
+            rooms.map((room) => (
+              <RoomCard key={room.id} room={room} onSelect={onSelect} />
+            ))
+          )}
         </div>
       </div>
     </section>

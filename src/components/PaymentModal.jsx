@@ -5,9 +5,10 @@ import { rupiah } from "../utils/format";
 import { fmtShort } from "../utils/date";
 import { compressProof, isImageFile, MAX_PROOF_BYTES } from "../utils/image";
 
-export default function PaymentModal({ room, checkIn, checkOut, price, guestName, guestCount, onClose, onSuccess }) {
+export default function PaymentModal({ room, checkIn, checkOut, price, guestName, guestCount, onClose, onSubmit }) {
   const [method, setMethod] = useState("bca");
   const [processing, setProcessing] = useState(false);
+  const [error, setError] = useState("");
   const [proof, setProof] = useState(null);
   const [proofName, setProofName] = useState("");
   const [proofError, setProofError] = useState("");
@@ -50,8 +51,14 @@ export default function PaymentModal({ room, checkIn, checkOut, price, guestName
   const confirm = async () => {
     if (processing || !proof) return;
     setProcessing(true);
-    await new Promise((r) => setTimeout(r, 1500)); // simulasi pembayaran
-    onSuccess(PAY_METHODS.find((m) => m.id === method).label, proof);
+    setError("");
+    try {
+      await onSubmit(method, proof);
+      // Sukses: induk (BookingModal) akan menutup modal & menampilkan toast.
+    } catch (e) {
+      setError(e.message || "Pembayaran gagal. Silakan coba lagi.");
+      setProcessing(false);
+    }
   };
 
   return (
@@ -176,8 +183,12 @@ export default function PaymentModal({ room, checkIn, checkOut, price, guestName
 
           <div className="mt-4 flex items-start gap-2 rounded-xl bg-warm/15 px-3.5 py-3 text-[11px] leading-relaxed text-warm-dark">
             <FlaskConical className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            Ini prototipe — tidak ada transaksi uang sungguhan. Data DP dan bukti transfer hanya tersimpan di browser Anda.
+            Booking dan bukti transfer dikirim ke server. Admin akan memverifikasi pembayaran Anda.
           </div>
+
+          {error && (
+            <p className="mt-3 rounded-xl bg-full/10 px-3.5 py-2.5 text-xs font-medium text-full">{error}</p>
+          )}
 
           <button type="button" onClick={confirm} disabled={processing || !proof} className="btn-primary mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-warm px-5 py-3.5 font-semibold text-primary-900 shadow-soft">
             {processing ? (
